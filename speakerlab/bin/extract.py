@@ -76,12 +76,21 @@ def main():
             for k in local_k:
                 wav_path = data[k]
                 wav, fs = torchaudio.load(wav_path)
+                target_sample_rate = config.sample_rate
+                if fs != target_sample_rate:
+                    import torchaudio.transforms as T
+                    resampler = T.Resample(orig_freq=fs,
+                                           new_freq=target_sample_rate)
+                    wav = resampler(wav)
+                    fs = target_sample_rate
+
                 assert fs == config.sample_rate, f"The sample rate of wav is {fs} and inconsistent with that of the pretrained model."
                 feat = feature_extractor(wav)
                 feat = feat.unsqueeze(0)
                 feat = feat.to(device)
                 emb = embedding_model(feat).detach().cpu().numpy()
                 writer(k, emb)
+
 
 if __name__ == "__main__":
     main()

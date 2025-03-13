@@ -77,9 +77,9 @@ if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
 
   mkdir -p ${data}/musan ${data}/rirs ${data}/cnceleb_train ${data}/eval
   # musan
-  find $(pwd)/${rawdata_dir}/musan/noise/free-sound -name "*.wav" | awk -F"/" '{print $(NF-2)"/"$(NF-1)"/"$NF,$0}' > ${data}/musan/wav.scp
+  find ${rawdata_dir}/musan/noise/free-sound -name "*.wav" | awk -F"/" '{print $(NF-2)"/"$(NF-1)"/"$NF,$0}' > ${data}/musan/wav.scp
   # rirs
-  awk '{print $5}' $(pwd)/${rawdata_dir}/RIRS_NOISES/real_rirs_isotropic_noises/rir_list | xargs -I {} echo {} $(pwd)/${rawdata_dir}/{} > ${data}/rirs/wav.scp
+  awk '{print $5}' ${rawdata_dir}/RIRS_NOISES/real_rirs_isotropic_noises/rir_list | xargs -I {} echo {} ${rawdata_dir}/{} > ${data}/rirs/wav.scp
 
   echo "Prepare train data including CN-Celeb_wav/dev and CN-Celeb2_wav ..."
   [ -f ${data}/cnceleb_train/wav.scp ] && rm ${data}/cnceleb_train/wav.scp

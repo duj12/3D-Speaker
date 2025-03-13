@@ -5,15 +5,15 @@
 set -e
 . ./path.sh || exit 1
 
-stage=1
+stage=3
 stop_stage=6
 
-data=data
+data=/data/megastore/Datasets/ASR/CNCeleb
 exp=exp
 exp_dir=$exp/eres2netv2
 exp_lm_dir=$exp/eres2netv2_lm
 
-gpus="0 1 2 3"
+gpus="0 1 2 3 4 5 6 7"
 
 . utils/parse_options.sh || exit 1
 
@@ -52,8 +52,8 @@ fi
 if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
   # Extract embeddings of test datasets.
   echo "Stage5: Extracting speaker embeddings..."
-  torchrun --nproc_per_node=12 speakerlab/bin/extract.py --exp_dir $exp_lm_dir \
-           --data $data/cnceleb_test/wav.scp --use_gpu --gpu $gpus
+  torchrun --nproc_per_node=4 speakerlab/bin/extract.py --exp_dir $exp_lm_dir \
+           --data $data/cnceleb_test/wav.scp --use_gpu --gpu 5
 fi
 
 if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
