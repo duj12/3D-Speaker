@@ -10,7 +10,7 @@ stop_stage=7
 
 data=/data/megastore/Datasets/ASR/SensitiveSpk/data
 exp=exp
-exp_lm_dir=$exp/eres2netv2w24s4ep4_0312
+exp_lm_dir=$exp/eres2netv2w24s4ep4_0313
 
 gpus="0 1 2 3 4 5 6 7"
 
@@ -27,9 +27,11 @@ if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
   # Output score metrics.
   echo "Stage6: Computing score metrics..."
   trials="$data/test/trials.txt"
-  python speakerlab/bin/compute_score_metrics.py --enrol_data $exp_lm_dir/embeddings --test_data $exp_lm_dir/embeddings \
-                                                 --scores_dir $exp_lm_dir/scores --trials $trials  \
-                                                 --enroll_utt2spk $data/enroll/utt2spk
+  python speakerlab/bin/compute_score_metrics.py \
+    --enrol_data $exp_lm_dir/embeddings \
+    --test_data $exp_lm_dir/embeddings \
+    --scores_dir $exp_lm_dir/scores --trials $trials  # \
+    #  --enroll_utt2spk $data/enroll/utt2spk
 fi
 
 if [ ${stage} -le 7 ] && [ ${stop_stage} -ge 7 ]; then
@@ -37,7 +39,8 @@ if [ ${stage} -le 7 ] && [ ${stop_stage} -ge 7 ]; then
   echo "Stage7: Predict the test wav"
   python speakerlab/bin/predict_spk.py \
     --model_dir $exp_lm_dir             \
-    --enrol_data $exp_lm_dir/embeddings \
-    --test_data "$data/test/test.scp" \
-    --test_label "$data/test/label.txt"
+    --enrol_emb $exp_lm_dir/embeddings/enroll_spkemb.ark \
+    --test_scp  "$data/test/test.scp" \
+    --test_label "$data/test/label.txt"  \
+    --test_emb $exp_lm_dir/embeddings  --threshold 0.6
 fi
