@@ -26,7 +26,7 @@ parser.add_argument('--threshold', default=0.54735, type=float,
                     help='the threshold, if the similarity exceed this value, mean the speaker is enroll')
 parser.add_argument('--test_label', default='', type=str, help='Test data label path')
 parser.add_argument('--test_emb', default='', type=str,
-                    help='Test data dir, include enroll speaker embeddings.')
+                    help='Test data dir, include test speaker embeddings.')
 
 def measure(y_pred, y_true):
     # 计算混淆矩阵，返回顺序为：[[TN, FP], [FN, TP]]
@@ -48,26 +48,30 @@ def measure(y_pred, y_true):
 def main():
     logger = get_logger()
     args = parser.parse_args(sys.argv[1:])
-    config_file = os.path.join(args.model_dir, 'config.yaml')
-    config = build_config(config_file)
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        msg = 'No cuda device is detected. Using the cpu device.'
-        logger.warning(msg)
-        device = torch.device('cpu')
 
-    # Build the embedding model
-    embedding_model = build('embedding_model', config)
-    # Recover the embedding params of last epoch
-    config.checkpointer['args']['checkpoints_dir'] = os.path.join(args.model_dir, 'models')
-    config.checkpointer['args']['recoverables'] = {'embedding_model':embedding_model}
-    checkpointer = build('checkpointer', config)
-    checkpointer.recover_if_possible(epoch=config.num_epoch, device=device)
+    def build_model():
+        config_file = os.path.join(args.model_dir, 'config.yaml')
+        config = build_config(config_file)
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            msg = 'No cuda device is detected. Using the cpu device.'
+            logger.warning(msg)
+            device = torch.device('cpu')
 
-    embedding_model.to(device)
-    embedding_model.eval()
-    feature_extractor = build('feature_extractor', config)
+        # Build the embedding model
+        embedding_model = build('embedding_model', config)
+        # Recover the embedding params of last epoch
+        config.checkpointer['args']['checkpoints_dir'] = os.path.join(args.model_dir, 'models')
+        config.checkpointer['args']['recoverables'] = {'embedding_model':embedding_model}
+        checkpointer = build('checkpointer', config)
+        checkpointer.recover_if_possible(epoch=config.num_epoch, device=device)
+
+        embedding_model.to(device)
+        embedding_model.eval()
+        feature_extractor = build('feature_extractor', config)
+
+        return config, embedding_model, feature_extractor, device
 
     def collect(data_dir):
         data_dict = {}
@@ -83,24 +87,17 @@ def main():
 
         return data_dict
 
-    enrol_dict = {}
-    with ReadHelper(f'ark:{args.enrol_emb}') as reader:
-        for key, array in reader:
-            enrol_dict[key] = array
-    test_dict = load_wav_scp(args.test_scp)
     result_path = os.path.join(args.model_dir, 'result.txt')
+    # result_path = "/data/megastore/Datasets/ASR/SensitiveSpk/data/test/result_0.54735.txt"
+    # args.test_label = "/data/megastore/Datasets/ASR/SensitiveSpk/data/test/label.txt"
+    # args.threshold = 0.6
 
-    scores = []     # 测试音频与注册说话人向量的最高相似度得分
+    scores = []     # 测试音频与注册说话人向量的最高相似度得分s
     predicts = []   # 预测结果，0标示未注册，1表示注册
     labels = []     # 如果有标注正负例标签，则加到这里面计算准确率信息
 
     if args.test_label != "":
         test_labels = load_wav_scp(args.test_label)
-
-    if args.test_emb != "":
-        test_emb_dict = collect(args.test_emb)
-        for utt in test_dict:
-            test_dict[utt] = test_emb_dict[utt]
 
     if os.path.exists(result_path):
         with open(result_path, 'r') as fin:
@@ -118,6 +115,17 @@ def main():
                 predicts.append(predict)
                 labels.append(label)
     else:
+        enrol_dict = {}
+        with ReadHelper(f'ark:{args.enrol_emb}') as reader:
+            for key, array in reader:
+                enrol_dict[key] = array
+        test_dict = load_wav_scp(args.test_scp)
+
+        if args.test_emb != "":
+            test_emb_dict = collect(args.test_emb)
+            for utt in test_dict:
+                test_dict[utt] = test_emb_dict[utt]
+
         with open(result_path, 'w') as score_f:
             for test_utt in tqdm(test_dict, desc=f'Test...'):
                 wav_path = test_dict[test_utt]
@@ -125,6 +133,7 @@ def main():
 
                 if args.test_emb == "":
                     with torch.no_grad():
+                        config, embedding_model, feature_extractor, device = build_model()
                         wav, fs = torchaudio.load(wav_path)
                         target_sample_rate = config.sample_rate
                         if fs != target_sample_rate:
